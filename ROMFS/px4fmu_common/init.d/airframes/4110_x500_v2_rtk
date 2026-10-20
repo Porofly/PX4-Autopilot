@@ -1,0 +1,94 @@
+#!/bin/sh
+#
+# @name Holybro X500 V2 RTK
+#
+# @type Quadrotor x
+# @class Copter
+#
+# @maintainer MDEAGEWT
+#
+# @board px4_fmu-v2 exclude
+# @board bitcraze_crazyflie exclude
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+# Holybro X500 V2 (4019_x500_v2) + the RC switch / flight-mode layout, RTK GPS, LoRa RTCM link,
+# Zenoh and PWM motor outputs used on the lab x500 (values taken from the 2026-10-12/10-19 flight logs).
+# Everything is set-default, so a value changed in QGC is kept across reboots.
+# 4111_x500_v2_rtk_dshot = this airframe with bidirectional DShot motor outputs.
+
+param set-default IMU_GYRO_CUTOFF 30
+
+param set-default MC_ROLLRATE_P 0.14
+param set-default MC_PITCHRATE_P 0.14
+param set-default MC_ROLLRATE_I 0.3
+param set-default MC_PITCHRATE_I 0.3
+param set-default MC_ROLLRATE_D 0.004
+param set-default MC_PITCHRATE_D 0.004
+
+# Square quadrotor X PX4 numbering
+param set-default CA_ROTOR_COUNT 4
+param set-default CA_ROTOR0_PX 1
+param set-default CA_ROTOR0_PY 1
+param set-default CA_ROTOR1_PX -1
+param set-default CA_ROTOR1_PY -1
+param set-default CA_ROTOR2_PX 1
+param set-default CA_ROTOR2_PY -1
+param set-default CA_ROTOR2_KM -0.05
+param set-default CA_ROTOR3_PX -1
+param set-default CA_ROTOR3_PY 1
+param set-default CA_ROTOR3_KM -0.05
+
+# Flight modes: 3-position switch on channel 15 (low / mid / high = slot 1 / 4 / 6)
+param set-default RC_MAP_FLTMODE 15
+param set-default COM_FLTMODE1 0           # Manual
+param set-default COM_FLTMODE4 2           # Position
+param set-default COM_FLTMODE6 11          # Land
+
+# Switches
+param set-default RC_MAP_ARM_SW 16
+param set-default RC_MAP_KILL_SW 13
+param set-default RC_MAP_LOITER_SW 17
+
+# RTK GPS
+param set-default GPS_UBX_MODE 3
+param set-default EKF2_GPS_P_NOISE 0.2
+param set-default EKF2_GPS_V_NOISE 0.2
+
+# GPS antenna position relative to the centre of gravity (FRD, m)
+# (= EKF2_GPS_POS_X/Y/Z on PX4 <= 1.17)
+param set-default SENS_GNSS0_OFFX -0.095
+param set-default SENS_GNSS0_OFFY 0.0
+param set-default SENS_GNSS0_OFFZ -0.15
+
+param set-default BAT1_N_CELLS 4
+
+# Motors on FMU outputs (AUX) 1-4, PWM 400 Hz
+param set-default PWM_AUX_FUNC1 101
+param set-default PWM_AUX_FUNC2 102
+param set-default PWM_AUX_FUNC3 103
+param set-default PWM_AUX_FUNC4 104
+param set-default PWM_AUX_MIN1 1100
+param set-default PWM_AUX_MIN2 1100
+param set-default PWM_AUX_MIN3 1100
+param set-default PWM_AUX_MIN4 1100
+param set-default PWM_AUX_MAX1 1900
+param set-default PWM_AUX_MAX2 1900
+param set-default PWM_AUX_MAX3 1900
+param set-default PWM_AUX_MAX4 1900
+
+# Telemetry radio on TELEM1 (MAV_0, normal mode)
+param set-default SER_TEL1_BAUD 115200
+
+# LoRa link on TELEM3: receive only (RTCM corrections for the RTK GPS), MAV_x_MODE 15 = LoRa Rx
+param set-default MAV_1_CONFIG 103
+param set-default MAV_1_MODE 15
+param set-default MAV_1_BROADCAST 0
+param set-default MAV_1_FLOW_CTRL 2
+param set-default MAV_1_RADIO_CTL 0
+param set-default SER_TEL3_BAUD 115200
+
+# Zenoh (px4_fmu-v6x_zenoh build; companion router at tcp/10.41.10.1:7447 over Ethernet)
+param set-default ZENOH_ENABLE 1
+param set-default ZENOH_DOMAIN_ID 144

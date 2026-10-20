@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# @name Holybro X500 V2 RTK DShot
+#
+# @type Quadrotor x
+# @class Copter
+#
+# @maintainer MDEAGEWT
+#
+# @board px4_fmu-v2 exclude
+# @board bitcraze_crazyflie exclude
+#
+
+. ${R}etc/init.d/airframes/4110_x500_v2_rtk
+
+# Same as 4110_x500_v2_rtk, but the motors (FMU outputs 1-4) use bidirectional DShot300
+# (= DShot300 + DSHOT_BIDIR_EN 1 on PX4 <= 1.17), so esc_status carries the motor RPM.
+
+param set-default PWM_AUX_TIM0 -7          # BDShot300
