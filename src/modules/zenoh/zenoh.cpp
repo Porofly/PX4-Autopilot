@@ -61,6 +61,11 @@
 
 ModuleBase::Descriptor ZENOH::desc{task_spawn, custom_command, print_usage};
 
+// zenoh-pico reconnects (_z_reopen: TCP connect, handshake, re-declarations) on its lease task.
+// The 2 KB default pthread stack is too small there: a reconnect peaked at ~1.8 KB and the same
+// open path reaches ~3.3 KB on this module task.
+static constexpr size_t ZENOH_PICO_TASK_STACK_SIZE = 5120;
+
 #define Z_PUBLISH
 #define Z_SUBSCRIBE
 
@@ -328,7 +333,22 @@ int ZENOH::setupSession()
 	} while ((ret = z_open(&_s, z_move(config), NULL)) < 0);
 
 	// Start read and lease tasks for zenoh-pico
-	if (zp_start_read_task(z_loan_mut(_s), NULL) < 0 || zp_start_lease_task(z_loan_mut(_s), NULL) < 0) {
+	pthread_attr_init(&_zenoh_pico_task_attr);
+
+	if (pthread_attr_setstacksize(&_zenoh_pico_task_attr, ZENOH_PICO_TASK_STACK_SIZE) != 0) {
+		PX4_ERR("Unable to set the zenoh-pico task stack size");
+		return -EINVAL;
+	}
+
+	zp_task_read_options_t read_options;
+	zp_task_read_options_default(&read_options);
+	read_options.task_attributes = &_zenoh_pico_task_attr;
+
+	zp_task_lease_options_t lease_options;
+	zp_task_lease_options_default(&lease_options);
+	lease_options.task_attributes = &_zenoh_pico_task_attr;
+
+	if (zp_start_read_task(z_loan_mut(_s), &read_options) < 0 || zp_start_lease_task(z_loan_mut(_s), &lease_options) < 0) {
 		PX4_ERR("Unable to start read and lease tasks");
 		ret = -EINVAL;
 	}
@@ -544,6 +564,7 @@ void ZENOH::cleanupSession()
 		zp_stop_lease_task(z_session_loan_mut(&_s));
 
 		z_drop(z_session_move(&_s));
+		pthread_attr_destroy(&_zenoh_pico_task_attr);
 	}
 
 	_connected.store(false);

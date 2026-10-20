@@ -36,6 +36,7 @@
 
 #include <termios.h>
 #include <poll.h>
+#include <pthread.h>
 #include <sys/select.h>
 #include <sys/time.h>
 
@@ -115,6 +116,8 @@ private:
 	Zenoh_Subscriber **_zenoh_subscribers = nullptr;
 
 	z_owned_session_t _s;
+	// zenoh-pico keeps this pointer and reuses it for the read and lease tasks it restarts on reconnect
+	pthread_attr_t _zenoh_pico_task_attr{};
 	// written by the module task, read by print_status() from the shell task
 	px4::atomic_bool _connected{false};
 
