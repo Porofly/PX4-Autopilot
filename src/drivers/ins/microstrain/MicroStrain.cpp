@@ -1722,6 +1722,7 @@ void MicroStrain::gnssCallback(void *user, const mip_packet *packet, mip::Timest
 				      gps_leap_sec.sample.leap_seconds) * 1000000;
 
 		gnss.satellites_used = fix_info.sample.num_sv;
+		gnss.diff_age = UINT16_MAX; // not reported
 
 		gnss.rtcm_injection_rate = 0;
 		gnss.selected_rtcm_instance = 0;

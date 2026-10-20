@@ -545,6 +545,7 @@ void UavcanGnssBridge::process_fixx(const uavcan::ReceivedDataStructure<FixType>
 	}
 
 	sensor_gnss.satellites_used = msg.sats_used;
+	sensor_gnss.diff_age = UINT16_MAX; // not reported
 
 	if (hrt_elapsed_time(&_last_gnss_auxiliary_timestamp) < 2_s) {
 		sensor_gnss.hdop = _last_gnss_auxiliary_hdop;

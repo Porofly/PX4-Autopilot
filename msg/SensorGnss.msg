@@ -77,6 +77,7 @@ uint32 SYSTEM_ERROR_OUTPUT_CONGESTION    = 64
 
 float32 rtcm_injection_rate  # [Hz] Correction injection rate
 uint8 selected_rtcm_instance # [-] uORB instance used for corrections
+uint16 diff_age              # [s] Age of the most recent differential correction the receiver received, 0xFFFF = not available. u-blox reports it binned (bin midpoint, the real age can be up to half a bin older)
 
 uint8 corrections_protocol         # [@enum CORRECTIONS_PROTOCOL] Protocol of the last correction message the receiver parsed
 uint8 CORRECTIONS_PROTOCOL_UNKNOWN = 0

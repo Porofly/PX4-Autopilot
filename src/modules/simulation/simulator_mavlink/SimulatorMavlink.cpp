@@ -434,6 +434,7 @@ void SimulatorMavlink::handle_message_hil_gps(const mavlink_message_t *msg)
 	gnss.time_utc_usec = hil_gps.time_usec;
 
 	gnss.satellites_used = hil_gps.satellites_visible;
+	gnss.diff_age = UINT16_MAX; // not in HIL_GPS
 
 	gnss.timestamp = hrt_absolute_time();
 

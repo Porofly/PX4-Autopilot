@@ -537,6 +537,7 @@ void ILabs::processData(InertialLabs::SensorsData *data) {
 		sensor_gnss.timestamp_time_relative = 0;
 
 		sensor_gnss.satellites_used = data->gps.usedSatCount;
+		sensor_gnss.diff_age = UINT16_MAX; // not reported
 
 		_sensor_gnss_pub.publish(sensor_gnss);
 		perf_count(_gnss_pub_interval_perf);

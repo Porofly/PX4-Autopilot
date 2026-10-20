@@ -439,6 +439,7 @@ void VectorNav::sensorCallback(VnUartPacket *packet)
 			sensor_gnss.time_utc_usec = 0;
 
 			sensor_gnss.satellites_used = numSats;
+			sensor_gnss.diff_age = UINT16_MAX; // not reported
 
 			sensor_gnss.fix_type = gpsFix;
 

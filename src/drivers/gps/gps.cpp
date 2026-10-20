@@ -402,6 +402,8 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 	int32_t enable_sat_info = 0;
 	param_get(param_find("GPS_SAT_INFO"), &enable_sat_info);
 
+	_sensor_gnss.diff_age = UINT16_MAX; // not available until a driver reports it (0 would read as 0 s old)
+
 	/* create satellite info data object if requested */
 	if (enable_sat_info) {
 		_sat_info = new GPS_Sat_Info();
@@ -1109,6 +1111,7 @@ GPS::run()
 
 			/* reset report */
 			memset(&_sensor_gnss, 0, sizeof(_sensor_gnss));
+			_sensor_gnss.diff_age = UINT16_MAX; // not available until a driver reports it (0 would read as 0 s old)
 
 #if defined(CONFIG_GPS_UBX)
 

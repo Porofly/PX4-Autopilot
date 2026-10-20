@@ -1948,6 +1948,7 @@ bool SeptentrioDriver::is_healthy() const
 void SeptentrioDriver::reset_gnss_state_message()
 {
 	memset(&_sensor_gnss, 0, sizeof(_sensor_gnss));
+	_sensor_gnss.diff_age = UINT16_MAX; // not reported
 }
 
 uint32_t SeptentrioDriver::get_parameter(const char *name, int32_t *value)

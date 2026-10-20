@@ -575,6 +575,7 @@ void SbgEcom::handleLogGnssPosVel(SbgEComMsgId msg, const SbgEComLogUnion *ref_s
 		sensor_gnss.time_utc_usec = 0;
 
 		sensor_gnss.satellites_used = gnss_data->gps_pos.numSvUsed;
+		sensor_gnss.diff_age = UINT16_MAX; // not reported
 		instance->_sensor_gnss_pub.publish(sensor_gnss);
 		perf_count(instance->_gnss_pub_interval_perf);
 

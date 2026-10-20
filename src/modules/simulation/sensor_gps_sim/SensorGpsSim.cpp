@@ -195,6 +195,7 @@ void SensorGpsSim::Run()
 		sensor_gnss.spoofing_state = 0;
 		sensor_gnss.vel_ned_valid = true;
 		sensor_gnss.satellites_used = _sim_gps_used.get();
+		sensor_gnss.diff_age = UINT16_MAX; // not simulated
 
 		publishWithFailures(0, sensor_gnss, _sensor_gnss_pub);
 

@@ -85,6 +85,7 @@ void FakeGps::Run()
 	sensor_gnss.spoofing_state = 0;
 	sensor_gnss.vel_ned_valid = true;
 	sensor_gnss.satellites_used = 14;
+	sensor_gnss.diff_age = UINT16_MAX; // not simulated
 	sensor_gnss.timestamp = hrt_absolute_time();
 	_sensor_gnss_pub.publish(sensor_gnss);
 

@@ -778,6 +778,7 @@ void GZBridge::navSatCallback(const gz::msgs::NavSat &msg)
 	sensor_gnss.spoofing_state = 0;
 	sensor_gnss.vel_ned_valid = true;
 	sensor_gnss.satellites_used = _sim_gps_used.get();
+	sensor_gnss.diff_age = UINT16_MAX; // not simulated
 
 	if (failure_injection::process_gnss(_failure_config, _sensor_gnss_pub.get_instance(), sensor_gnss, _gnss_stuck)) {
 		_sensor_gnss_pub.publish(sensor_gnss);
