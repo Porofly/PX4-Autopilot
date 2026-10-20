@@ -341,7 +341,6 @@ private:
 	bool _warned_component_states_full_once{false};
 
 	bool _message_statistics_enabled {false};
-#if !defined(CONSTRAINED_FLASH)
 	static constexpr int MAX_MSG_STAT_SLOTS {16};
 	struct ReceivedMessageStats {
 		float avg_rate_hz{0.f}; // average rate
@@ -351,7 +350,6 @@ private:
 		uint8_t component_id{0};
 	};
 	ReceivedMessageStats *_received_msg_stats{nullptr};
-#endif // !CONSTRAINED_FLASH
 
 	uint64_t _total_received_counter{0};                            ///< The total number of successfully received messages
 	uint64_t _total_lost_counter{0};                                ///< Total messages lost during transmission.

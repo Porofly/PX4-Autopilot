@@ -811,7 +811,8 @@ private:
 
 	void pass_message(const mavlink_message_t *msg);
 
-	void publish_telemetry_status();
+	void publish_telemetry_status(bool without_heartbeats = false);
+	void update_byte_rates(const hrt_abstime t);
 
 	void check_requested_subscriptions();
 

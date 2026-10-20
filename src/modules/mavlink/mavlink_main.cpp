@@ -2846,6 +2846,16 @@ Mavlink::task_main(int argc, char *argv[])
 			handleStatus();
 			handleCommands();
 			handleAndGetCurrentCommandAck();
+
+			// keep the RX/TX byte rates current on links that do not transmit (e.g. LoRa Rx, Iridium off, -w)
+			update_byte_rates(hrt_absolute_time());
+
+			// a receive-only LoRa link still logs its link statistics, but without heartbeats: the vehicle
+			// cannot answer over it, so it must not count as a GCS (or any other) connection in commander
+			if (_mode == MAVLINK_MODE_LORARX && hrt_elapsed_time(&_tstatus.timestamp) >= 1_s) {
+				publish_telemetry_status(true);
+			}
+
 			continue;
 		}
 
@@ -2975,18 +2985,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 		unlock_send();
 
-		/* update TX/RX rates*/
-		if (t > _bytes_timestamp + 1_s) {
-			if (_bytes_timestamp != 0) {
-				const float dt = (t - _bytes_timestamp) * 1e-6f;
-
-				_tstatus.tx_rate_avg = _bytes_tx.fetch_and(0) / dt;
-				_tstatus.tx_error_rate_avg = _bytes_txerr.fetch_and(0) / dt;
-				_tstatus.rx_rate_avg = _bytes_rx.fetch_and(0) / dt;
-			}
-
-			_bytes_timestamp = t;
-		}
+		update_byte_rates(t);
 
 		// publish status at 1 Hz, or sooner if HEARTBEAT has updated
 		if ((hrt_elapsed_time(&_tstatus.timestamp) >= 1_s) || _tstatus_updated.load()) {
@@ -3354,7 +3353,22 @@ void Mavlink::check_requested_subscriptions()
 	}
 }
 
-void Mavlink::publish_telemetry_status()
+void Mavlink::update_byte_rates(const hrt_abstime t)
+{
+	if (t > _bytes_timestamp + 1_s) {
+		if (_bytes_timestamp != 0) {
+			const float dt = (t - _bytes_timestamp) * 1e-6f;
+
+			_tstatus.tx_rate_avg = _bytes_tx.fetch_and(0) / dt;
+			_tstatus.tx_error_rate_avg = _bytes_txerr.fetch_and(0) / dt;
+			_tstatus.rx_rate_avg = _bytes_rx.fetch_and(0) / dt;
+		}
+
+		_bytes_timestamp = t;
+	}
+}
+
+void Mavlink::publish_telemetry_status(bool without_heartbeats)
 {
 	// many fields are populated in place
 	pthread_mutex_lock(&_tstatus_mutex);
@@ -3374,7 +3388,30 @@ void Mavlink::publish_telemetry_status()
 	_tstatus.streams = _streams.size();
 
 	_tstatus.timestamp = hrt_absolute_time();
-	_telemetry_status_pub.publish(_tstatus);
+
+	if (without_heartbeats) {
+		telemetry_status_s tstatus = _tstatus;
+		tstatus.heartbeat_type_antenna_tracker = false;
+		tstatus.heartbeat_type_gcs = false;
+		tstatus.heartbeat_type_onboard_controller = false;
+		tstatus.heartbeat_type_gimbal = false;
+		tstatus.heartbeat_type_adsb = false;
+		tstatus.heartbeat_type_flarm = false;
+		tstatus.heartbeat_type_camera = false;
+		tstatus.heartbeat_type_parachute = false;
+		tstatus.heartbeat_type_open_drone_id = false;
+		tstatus.heartbeat_component_telemetry_radio = false;
+		tstatus.heartbeat_component_log = false;
+		tstatus.heartbeat_component_osd = false;
+		tstatus.heartbeat_component_vio = false;
+		tstatus.heartbeat_component_pairing_manager = false;
+		tstatus.heartbeat_component_udp_bridge = false;
+		tstatus.heartbeat_component_uart_bridge = false;
+		_telemetry_status_pub.publish(tstatus);
+
+	} else {
+		_telemetry_status_pub.publish(_tstatus);
+	}
 
 	pthread_mutex_unlock(&_tstatus_mutex);
 	_tstatus_updated.store(false);
@@ -3541,9 +3578,7 @@ Mavlink::start(int argc, char *argv[])
 void
 Mavlink::display_status()
 {
-#if !defined(CONSTRAINED_FLASH)
 	_receiver.enable_message_statistics();
-#endif // !CONSTRAINED_FLASH
 
 	if (_tstatus.heartbeat_type_gcs) {
 		printf("\tGCS heartbeat valid\n");
@@ -3595,9 +3630,7 @@ Mavlink::display_status()
 	printf("\t  rx unknown messages: %" PRIu32 "\n", _tstatus.rx_unknown_message_count);
 	printf("\t  rx bad signatures: %" PRIu32 "\n", _tstatus.rx_bad_signature_count);
 
-#if !defined(CONSTRAINED_FLASH)
 	_receiver.print_detailed_rx_stats();
-#endif // !CONSTRAINED_FLASH
 
 	if (_mavlink_ulog) {
 		printf("\tULog rate: %.1f%% of max %.1f%%\n", (double)_mavlink_ulog->current_data_rate() * 100.,

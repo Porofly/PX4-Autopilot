@@ -82,9 +82,7 @@ MavlinkReceiver::~MavlinkReceiver()
 	delete _px4_accel;
 	delete _px4_gyro;
 	delete _px4_mag;
-#if !defined(CONSTRAINED_FLASH)
 	delete[] _received_msg_stats;
-#endif // !CONSTRAINED_FLASH
 
 	_distance_sensor_pub.unadvertise();
 	_rtcm_corrections_pub.unadvertise();
@@ -4294,7 +4292,6 @@ void MavlinkReceiver::update_rx_stats(const mavlink_message_t &message, bool add
 
 void MavlinkReceiver::update_message_statistics(const mavlink_message_t &message)
 {
-#if !defined(CONSTRAINED_FLASH)
 
 	if (_received_msg_stats == nullptr) {
 		_received_msg_stats = new ReceivedMessageStats[MAX_MSG_STAT_SLOTS];
@@ -4360,7 +4357,6 @@ void MavlinkReceiver::update_message_statistics(const mavlink_message_t &message
 		}
 	}
 
-#endif // !CONSTRAINED_FLASH
 }
 
 void MavlinkReceiver::print_detailed_rx_stats() const
@@ -4375,7 +4371,6 @@ void MavlinkReceiver::print_detailed_rx_stats() const
 				       comp_stat.system_id, comp_stat.component_id,
 				       comp_stat.received_messages, comp_stat.missed_messages);
 
-#if !defined(CONSTRAINED_FLASH)
 
 				if (_message_statistics_enabled && _received_msg_stats) {
 					for (int i = 0; i < MAX_MSG_STAT_SLOTS; i++) {
@@ -4397,7 +4392,6 @@ void MavlinkReceiver::print_detailed_rx_stats() const
 					}
 				}
 
-#endif // !CONSTRAINED_FLASH
 			}
 		}
 	}
