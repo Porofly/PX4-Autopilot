@@ -2324,6 +2324,12 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_streams_local(streams_mode_distance_sensor);
 		break;
 
+	case MAVLINK_MODE_LORARX:
+		// receive only (e.g. RTCM GPS corrections over a LoRa link): never transmit
+		_transmitting_enabled_commanded = false;
+		_transmitting_enabled = false;
+		break;
+
 	default:
 		ret = -1;
 		break;

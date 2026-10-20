@@ -180,6 +180,7 @@ public:
 		MAVLINK_MODE_UAVIONIX,
 		MAVLINK_MODE_LOW_BANDWIDTH,
 		MAVLINK_MODE_DISTANCE_SENSOR,
+		MAVLINK_MODE_LORARX,
 		MAVLINK_MODE_COUNT
 	};
 
@@ -242,6 +243,9 @@ public:
 
 		case MAVLINK_MODE_DISTANCE_SENSOR:
 			return "DistanceSensor";
+
+		case MAVLINK_MODE_LORARX:
+			return "LoraRx";
 
 		default:
 			return "Unknown";
