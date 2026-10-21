@@ -66,6 +66,10 @@ ModuleBase::Descriptor ZENOH::desc{task_spawn, custom_command, print_usage};
 // open path reaches ~3.3 KB on this module task.
 static constexpr size_t ZENOH_PICO_TASK_STACK_SIZE = 5120;
 
+// Pause before opening a new session after topic setup failed, lets the router finish closing the old one
+static constexpr unsigned SETUP_RETRY_INTERVAL_MS = 2000;
+static constexpr unsigned SETUP_RETRY_POLL_MS = 100;
+
 #define Z_PUBLISH
 #define Z_SUBSCRIBE
 
@@ -578,33 +582,46 @@ void ZENOH::run()
 	_sub_count =  _config.getSubCount();
 	px4_pollfd_struct_t pfds[_pub_count];
 
-	// Publishers that fail to set up never get a poll fd assigned, a negative fd makes poll skip them
-	for (i = 0; i < _pub_count; i++) {
-		pfds[i] = {};
-		pfds[i].fd = -1;
-	}
-
-	const int setup_ret = setupSession();
-
-	if (setup_ret < 0) {
-		if (setup_ret != -EINTR) {
-			PX4_ERR("Failed to setup Zenoh session");
+	while (true) {
+		// Publishers that fail to set up never get a poll fd assigned, a negative fd makes poll skip them
+		for (i = 0; i < _pub_count; i++) {
+			pfds[i] = {};
+			pfds[i].fd = -1;
 		}
 
+		const int setup_ret = setupSession();
+
+		if (setup_ret < 0) {
+			if (setup_ret != -EINTR) {
+				PX4_ERR("Failed to setup Zenoh session");
+			}
+
+			cleanupSession();
+			exit_and_cleanup(desc);
+			return;
+		}
+
+		_connected.store(true);
+
+		PX4_INFO("Starting reading/writing tasks...");
+
+		if (setupTopics(pfds) == 0) {
+			break;
+		}
+
+		// The router can drop a session right after opening it, e.g. while it still tears down
+		// the transport of our previous boot. Open a new session instead of giving up.
+		PX4_ERR("Failed to setup topics, retrying");
 		cleanupSession();
-		exit_and_cleanup(desc);
-		return;
-	}
 
-	_connected.store(true);
+		for (unsigned wait = 0; wait < SETUP_RETRY_INTERVAL_MS / SETUP_RETRY_POLL_MS && !should_exit(); wait++) {
+			px4_usleep(SETUP_RETRY_POLL_MS * 1000);
+		}
 
-	PX4_INFO("Starting reading/writing tasks...");
-
-	if (setupTopics(pfds) < 0) {
-		PX4_ERR("Failed to setup topics");
-		cleanupSession();
-		exit_and_cleanup(desc);
-		return;
+		if (should_exit()) {
+			exit_and_cleanup(desc);
+			return;
+		}
 	}
 
 	if (_pub_count == 0) {
@@ -614,8 +631,10 @@ void ZENOH::run()
 		}
 	}
 
-	static constexpr hrt_abstime POLL_ERROR_WARN_INTERVAL = 1000000; // 1 s
+	static constexpr hrt_abstime ERROR_WARN_INTERVAL = 1000000; // 1 s
 	hrt_abstime last_poll_warn = 0;
+	hrt_abstime last_publish_warn = 0;
+	unsigned publish_errors = 0;
 
 	while (!should_exit()) {
 		int pret = px4_poll(pfds, _pub_count, 100);
@@ -624,7 +643,7 @@ void ZENOH::run()
 			//PX4_INFO("Zenoh poll timeout\n");
 
 		} else if (pret < 0) {
-			if (hrt_elapsed_time(&last_poll_warn) >= POLL_ERROR_WARN_INTERVAL) {
+			if (hrt_elapsed_time(&last_poll_warn) >= ERROR_WARN_INTERVAL) {
 				last_poll_warn = hrt_absolute_time();
 				PX4_ERR("poll error %d", errno);
 			}
@@ -637,9 +656,15 @@ void ZENOH::run()
 				if (_zenoh_publishers[i] && (pfds[i].revents & POLLIN)) {
 					ret = _zenoh_publishers[i]->update();
 
+					// Every sample fails while the router is gone, warn at most once per interval
 					if (ret < 0) {
-						PX4_WARN("%s Publisher error %i", _zenoh_publishers[i]->getName(), ret);
+						publish_errors++;
 
+						if (hrt_elapsed_time(&last_publish_warn) >= ERROR_WARN_INTERVAL) {
+							last_publish_warn = hrt_absolute_time();
+							PX4_WARN("%s Publisher error %i (%u errors)", _zenoh_publishers[i]->getName(), ret, publish_errors);
+							publish_errors = 0;
+						}
 					}
 				}
 			}

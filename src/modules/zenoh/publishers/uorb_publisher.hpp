@@ -61,7 +61,13 @@ public:
 		}
 	};
 
-	~uORB_Zenoh_Publisher() override = default;
+	// The module recreates its publishers when it opens a new session, do not leak the subscription
+	~uORB_Zenoh_Publisher() override
+	{
+		if (orb_sub_valid(_uorb_sub)) {
+			orb_unsubscribe(_uorb_sub);
+		}
+	}
 
 	// Update the uORB Subscription and broadcast a Zenoh ROS2 message
 	virtual z_result_t update() override
