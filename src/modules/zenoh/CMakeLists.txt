@@ -56,6 +56,16 @@ endif()
 set(Z_TRANSPORT_LEASE 60000 CACHE STRING "Link lease duration in milliseconds to announce to other zenoh nodes")
 set(Z_TRANSPORT_LEASE_EXPIRE_FACTOR 2 CACHE STRING "Link lease duration in milliseconds to announce to other zenoh nodes")
 
+# Bound a TCP send on a stalled link (e.g. router frozen with a zero window, link blackholed): the
+# failed send makes zenoh-pico drop the link and reconnect instead of blocking the module and the
+# lease task until TCP gives up (~30 s). A healthy Ethernet link never blocks this long.
+set(Z_CONFIG_SOCKET_SEND_TIMEOUT 2000 CACHE STRING "Send timeout of client TCP sockets in milliseconds")
+
+# Bound a TCP connect to a router that does not answer (e.g. companion computer switched off): NuttX
+# ignores SO_SNDTIMEO for connect, which would otherwise retry its SYN for more than a minute, and
+# `zenoh stop` waits for a reconnect in progress. On the local link a router answers within ms.
+set(Z_CONFIG_SOCKET_CONNECT_TIMEOUT 1000 CACHE STRING "Connect timeout of client TCP sockets in milliseconds")
+
 set(FRAG_MAX_SIZE 512 CACHE STRING "Use this to override the maximum size for fragmented messages")
 set(BATCH_UNICAST_SIZE 256 CACHE STRING "Use this to override the maximum unicast batch size")
 set(BATCH_MULTICAST_SIZE 256 CACHE STRING "Use this to override the maximum multicast batch size")
