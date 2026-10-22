@@ -78,8 +78,7 @@ int Zenoh_Subscriber::declare_subscriber(z_owned_session_t s, const char *keyexp
 	z_view_keyexpr_from_str(&ke, keyexpr);
 
 	if (z_declare_subscriber(z_loan(s), &_sub, z_loan(ke), z_closure_sample_move(&callback), NULL) < 0) {
-		printf("Unable to declare subscriber.\n");
-		exit(-1);
+		return -1;
 	}
 
 	return 0;

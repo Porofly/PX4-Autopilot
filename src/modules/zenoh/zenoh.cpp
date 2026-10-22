@@ -66,6 +66,12 @@ ModuleBase::Descriptor ZENOH::desc{task_spawn, custom_command, print_usage};
 // open path reaches ~3.3 KB on this module task.
 static constexpr size_t ZENOH_PICO_TASK_STACK_SIZE = 5120;
 
+// zenoh-pico keeps a pointer to these attributes and starts the read and lease tasks again with them
+// on every reconnect, so they must stay valid for as long as any session exists: static storage,
+// initialized once and never destroyed
+static pthread_attr_t zenoh_pico_task_attr;
+static bool zenoh_pico_task_attr_initialized = false;
+
 // Pause before opening a new session after topic setup failed, lets the router finish closing the old one
 static constexpr unsigned SETUP_RETRY_INTERVAL_MS = 2000;
 static constexpr unsigned SETUP_RETRY_POLL_MS = 100;
@@ -337,20 +343,24 @@ int ZENOH::setupSession()
 	} while ((ret = z_open(&_s, z_move(config), NULL)) < 0);
 
 	// Start read and lease tasks for zenoh-pico
-	pthread_attr_init(&_zenoh_pico_task_attr);
+	if (!zenoh_pico_task_attr_initialized) {
+		pthread_attr_init(&zenoh_pico_task_attr);
 
-	if (pthread_attr_setstacksize(&_zenoh_pico_task_attr, ZENOH_PICO_TASK_STACK_SIZE) != 0) {
-		PX4_ERR("Unable to set the zenoh-pico task stack size");
-		return -EINVAL;
+		if (pthread_attr_setstacksize(&zenoh_pico_task_attr, ZENOH_PICO_TASK_STACK_SIZE) != 0) {
+			PX4_ERR("Unable to set the zenoh-pico task stack size");
+			return -EINVAL;
+		}
+
+		zenoh_pico_task_attr_initialized = true;
 	}
 
 	zp_task_read_options_t read_options;
 	zp_task_read_options_default(&read_options);
-	read_options.task_attributes = &_zenoh_pico_task_attr;
+	read_options.task_attributes = &zenoh_pico_task_attr;
 
 	zp_task_lease_options_t lease_options;
 	zp_task_lease_options_default(&lease_options);
-	lease_options.task_attributes = &_zenoh_pico_task_attr;
+	lease_options.task_attributes = &zenoh_pico_task_attr;
 
 	if (zp_start_read_task(z_loan_mut(_s), &read_options) < 0 || zp_start_lease_task(z_loan_mut(_s), &lease_options) < 0) {
 		PX4_ERR("Unable to start read and lease tasks");
@@ -412,7 +422,11 @@ int ZENOH::setupTopics(px4_pollfd_struct_t *pfds)
 
 				if (rihs_hash != NULL && _zenoh_subscribers[i] != 0 &&
 				    generate_rmw_zenoh_topic_keyexpr(topic, rihs_hash, type, keyexpr) > 0) {
-					_zenoh_subscribers[i]->declare_subscriber(_s, keyexpr);
+					if (_zenoh_subscribers[i]->declare_subscriber(_s, keyexpr) < 0) {
+						PX4_ERR("Unable to declare subscriber for %s", topic);
+						return -1;
+					}
+
 #ifdef CONFIG_ZENOH_RMW_LIVELINESS
 
 					if (generate_rmw_zenoh_topic_liveliness_keyexpr(&self_id, topic, rihs_hash, type, keyexpr, "MS") > 0) {
@@ -541,6 +555,17 @@ void ZENOH::cleanupSession()
 {
 	PX4_INFO("Cleaning up Zenoh session...");
 
+	// A failed topic setup can stop in the middle of the mapping file, the next setup must read it from the start
+	_config.closePubSubMapping();
+
+	if (z_internal_check(_s)) {
+		// Close first: a reconnect in progress may still re-declare the subscribers, whose callbacks
+		// point at the objects deleted below. z_close() stops the read and lease tasks (or the
+		// reconnect) and waits for them, up to a pending connect or send timeout. The session stays
+		// allocated until the drop below, the undeclares on the deleted objects then fail harmlessly.
+		z_close(z_session_loan_mut(&_s), NULL);
+	}
+
 	for (int i = 0; i < _sub_count; i++) {
 		if (_zenoh_subscribers && _zenoh_subscribers[i]) {
 			delete _zenoh_subscribers[i];
@@ -564,11 +589,7 @@ void ZENOH::cleanupSession()
 	}
 
 	if (z_internal_check(_s)) {
-		zp_stop_read_task(z_session_loan_mut(&_s));
-		zp_stop_lease_task(z_session_loan_mut(&_s));
-
 		z_drop(z_session_move(&_s));
-		pthread_attr_destroy(&_zenoh_pico_task_attr);
 	}
 
 	_connected.store(false);
